@@ -116,3 +116,20 @@ node server.js
 - `server.js`: مدیریت روت‌ها و API.
 - `services/whatsapp.js`: مدیریت چرخه حیات واتس‌اپ.
 - `helpers/logger.js`: ثبت وقایع و لاگ‌های سیستم.
+
+
+## 🐧 استقرار روی لینوکس (Ubuntu/Debian)
+
+۱. **نصب وابستگی‌های کرومیوم:**
+   ```bash
+   sudo apt update
+   sudo apt install -y libgbm-dev wget gnupg ca-certificates procps libxss1 libasound2 libatk1.0-0 libc6 libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 libgconf-2-4 libgdk-pixbuf2.0-0 libglib2.0-0 libgtk-3-0 libnspr4 libpango-1.0-0 libpangocairo-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 libxdamage1 libext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 gconf-service lsb-release standard-notes
+   ```
+
+۲. **اجرا با PM2:**
+   ```bash
+   npm install pm2 -g
+   pm2 start ecosystem.config.js
+   pm2 save
+   pm2 startup
+   ```
