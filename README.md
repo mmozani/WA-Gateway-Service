@@ -1,76 +1,58 @@
 # 🚀 WA-Gateway-Service
 
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D%2018.0.0-brightgreen)](https://nodejs.org/)
-[![Framework](https://img.shields.io/badge/framework-Express-blue)](https://expressjs.com/)
-
-یک میکروسرویس سبک و امن برای مدیریت نشست‌های چندگانه واتس‌اپ و ارسال پیام‌های سیستمی (OTP، اعلان‌ها و ...) از طریق API.
+یک میکروسرویس حرفه‌ای و ماژولار برای مدیریت چندین حساب واتس‌اپ به صورت همزمان و ارسال پیام‌های سیستم (OTP) از طریق API.
 
 ---
 
-## ✨ قابلیت‌ها
+## ✨ قابلیت‌های کلیدی
 
-* **مدیریت چند سشن:** امکان اتصال همزمان چندین شماره واتس‌اپ.
-* **امنیت لایه‌بندی شده:** تایید هویت با API Key و محدودسازی آی‌پی‌های مجاز (Whitelist).
-* **پایداری در ویندوز و لینوکس:** مکانیزم هوشمند برای بستن و حذف سشن‌ها بدون قفل شدن فایل.
-* **سیستم لاگینگ:** ثبت تمام وقایع در فایل `access.log` برای عیب‌یابی سریع.
-* **Rate Limiting:** کنترل تعداد درخواست‌ها برای جلوگیری از بلاک شدن شماره‌ها.
+- **Multi-Session Support:** مدیریت چندین سشن واتس‌اپ با استفاده از `whatsapp-web.js`.
+- **Modular Architecture:** تفکیک منطق واتس‌اپ، لاگر و API برای توسعه آسان‌تر.
+- **Debug Mode:** قابلیت فعال/غیرفعال کردن لاگ‌های فنی از طریق فایل `.env`.
+- **Sender Identification:** بازگشت شماره فرستنده در پاسخ هر پیام برای مدیریت بهتر خطوط در سمت پنل (Laravel).
+- **Security:** محافظت شده با API Key و سیستم محدودسازی IP.
+- **Auto-Reinit:** قابلیت راه‌اندازی مجدد خودکار سشن پس از حذف.
 
 ---
 
-## 🛠 نصب و اجرا
+## 🛠 ساختار پروژه
 
-### ۱. نصب پیش‌نیازها
-```bash
-npm install
-```
-
-### ۲. تنظیمات (Environment Variables)
-یک فایل `.env` بسازید:
-```env
-PORT=30033
-SECRET_API_KEY="your_random_secure_string"
-ALLOWED_IPS=127.0.0.1,::1,192.168.
-IGNORE_IP_WHITELIST=true
-SESSION_IDS=line-1
-```
-
-### ۳. اجرا
-```bash
-# Development
-node server.js
-
-# Production
-pm2 start server.js --name wa-gateway
+```text
+├── helpers/        # توابع کمکی (Logger)
+├── services/       # منطق اصلی واتس‌اپ
+├── .wwebjs_auth/   # اطلاعات سشن‌ها (نادیده گرفته شده در گیت)
+├── server.js       # نقطه شروع برنامه و تعاریف API
+└── .env            # تنظیمات حساس
 ```
 
 ---
 
-## 📡 راهنمای استفاده از API
+## 🚀 راه اندازی سریع
 
-### ارسال پیام
-`POST /send-otp`
+1. **نصب پکیج‌ها:**
+   ```bash
+   npm install
+   ```
 
-**Headers:**
-`X-API-KEY: [مقدار تنظیم شده در فایل env]`
+2. **تنظیمات:**
+   فایل `.env.example` را به `.env` تغییر نام داده و مقادیر خود را جایگزین کنید.
 
-**Body (JSON):**
-```json
-{
-  "phone": "989123456789",
-  "message": "Hello World!",
-  "session_id": "line-1"
-}
-```
+3. **اجرا:**
+   ```bash
+   # حالت عادی
+   node server.js
 
-### حذف سشن (Logout)
-`DELETE /session/:id`
-این متد کلاینت را متوقف کرده و کش‌های مربوط به آن را برای اسکن مجدد پاک می‌کند.
+   # با استفاده از PM2 (توصیه شده برای سرور)
+   pm2 start server.js --name wa-gateway
+   ```
 
 ---
 
-## 🔒 ملاحظات امنیتی
-* پوشه `.wwebjs_auth` و فایل `.env` به طور خودکار توسط `.gitignore` نادیده گرفته می‌شوند تا امنیت اکانت شما حفظ شود.
-* توصیه می‌شود در محیط پروداکشن، `IGNORE_IP_WHITELIST` را روی `false` قرار دهید.
+## 📡 لیست APIها
+
+- **ارسال پیام:** `POST /send-otp`
+- **وضعیت سشن‌ها:** `GET /sessions-status`
+- **حذف سشن:** `DELETE /session/:id`
 
 ---
 
