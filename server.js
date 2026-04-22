@@ -38,18 +38,13 @@ const secureAPI = (req, res, next) => {
 // اعمال محدودیت روی تمام مسیرهای API
 app.use('/send-otp', globalLimiter);
 
-// ==========================================
-// 2. API Endpoints
-// ==========================================
 
-/**
- * ارسال پیام (OTP) با استفاده از مکانیزم Anti-Ban
- */
 app.post('/send-otp', secureAPI, async (req, res) => {
-    const { phone, message, session_id } = req.body;
+    // 1. دریافت ساختار جدید از Body
+    const { phone, message, code, session_id } = req.body;
 
-    if (!phone || !message) {
-        return res.status(400).json({ error: 'Phone and message are required' });
+    if (!phone || (!message && !code)) {
+        return res.status(400).json({ error: 'Phone and at least message or code are required' });
     }
 
     const activeSessionIds = process.env.SESSION_IDS ? process.env.SESSION_IDS.split(',') : [];
@@ -62,12 +57,19 @@ app.post('/send-otp', secureAPI, async (req, res) => {
     }
 
     try {
-        const formattedPhone = `${phone.replace('+', '').trim()}@c.us`;
+    
+        let cleanPhone = String(phone).trim().replace(/^(?:\+|00)/, '');
+        const formattedPhone = `${cleanPhone}@c.us`;
+
+        let finalMessage = message || '';
+        if (code) {
+            finalMessage = finalMessage ? `${finalMessage}${code}` : `${code}`;
+        }
+
+        // 4. ارسال پیام با متد ایمن (Anti-Ban)
+        await sendSecureMessage(session, formattedPhone, finalMessage);
         
-        // استفاده از متد ایمن (Anti-Ban) تعریف شده در خدمات واتس‌اپ
-        await sendSecureMessage(session, formattedPhone, message);
-        
-        logger('success', `Message sent to ${phone} via [${targetId}]`);
+        logger('success', `Message sent to ${cleanPhone} via [${targetId}]`);
         res.json({ 
             success: true, 
             via: targetId, 
@@ -80,9 +82,7 @@ app.post('/send-otp', secureAPI, async (req, res) => {
     }
 });
 
-/**
- * مشاهده وضعیت لحظه‌ای تمام سشن‌ها
- */
+
 app.get('/status', secureAPI, (req, res) => {
     const activeSessionIds = process.env.SESSION_IDS ? process.env.SESSION_IDS.split(',') : [];
     const report = activeSessionIds.map(id => {
