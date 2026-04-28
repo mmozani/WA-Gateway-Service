@@ -785,13 +785,12 @@ SOFTWARE.
   <b>🔗 لینک‌های مفید:</b><br>
   <a href="https://github.com/mmozani/WA-Gateway-Service/issues">🐛 گزارش مشکل</a> •
   <a href="https://github.com/mmozani/WA-Gateway-Service/discussions">💬 بحث و گفتگو</a> •
-  <a href="https://github.com/mmozani/WA-Gateway-Service/releases">📦 نسخه‌ها</a>
 </p>
 
 ---
 
 <div align="center">
 
-**© 2025 WA-Gateway-Service. Made with ❤️ in Iran 🇮🇷**
+**© 2026 WA-Gateway-Service. Made with ❤️ in Iran 🇮🇷**
 
 </div>
