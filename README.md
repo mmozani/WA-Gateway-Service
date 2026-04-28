@@ -792,6 +792,6 @@ SOFTWARE.
 
 <div align="center">
 
-**© 2024 WA-Gateway-Service. Made with ❤️ in Iran 🇮🇷**
+**© 2025 WA-Gateway-Service. Made with ❤️ in Iran 🇮🇷**
 
 </div>
