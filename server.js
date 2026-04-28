@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const fs = require('fs');
+const fsPromises = require('fs').promises; // ماژول غیرهمگان برای فایل‌ها
 const path = require('path');
 const logger = require('./helpers/logger');
 const { sessions, initializeSession, sendSecureMessage } = require('./services/whatsapp');
@@ -10,16 +11,42 @@ const app = express();
 app.use(express.json());
 
 // ==========================================
-// 1. Middlewares
+// 1. Core Configurations
 // ==========================================
 
-// محدودیت تعداد درخواست برای جلوگیری از سوءاستفاده (Rate Limiter)
+// فعال‌سازی Trust Proxy برای دریافت IP واقعی کاربر پشت Nginx
+app.set('trust proxy', process.env.TRUST_PROXY === 'false' ? false : 1);
+
+// ==========================================
+// 2. Middlewares
+// ==========================================
+
+// محدودیت تعداد درخواست (Rate Limiter)
 const globalLimiter = rateLimit({
     windowMs: 1 * 60 * 1000, // 1 دقیقه
-    max: 30, // حداکثر 30 درخواست در دقیقه برای هر IP
+    max: 30, // حداکثر 30 درخواست
     message: { error: 'Too many requests, please try again later.' }
 });
 
+// میدلور بررسی IP (Whitelist)
+const ipWhitelist = (req, res, next) => {
+    if (process.env.IGNORE_IP_WHITELIST === 'true') return next();
+    
+    const allowedIps = (process.env.ALLOWED_IPS || '').split(',').map(ip => ip.trim()).filter(Boolean);
+    if (allowedIps.length === 0) return next(); // اگر لیست خالی بود، رد کن
+
+    const clientIp = req.ip; // به لطف trust proxy اینجا IP واقعی هست
+    
+    const isAllowed = allowedIps.some(allowedIp => clientIp.startsWith(allowedIp));
+    
+    if (!isAllowed) {
+        logger('security', `Forbidden IP attempt: ${clientIp}`);
+        return res.status(403).json({ error: 'Forbidden: Your IP is not allowed.' });
+    }
+    next();
+};
+
+// میدلور احراز هویت با API Key
 const secureAPI = (req, res, next) => {
     const clientKey = (req.header('X-API-KEY') || '').trim();
     const serverKey = (process.env.SECRET_API_KEY || '').trim();
@@ -35,12 +62,15 @@ const secureAPI = (req, res, next) => {
     next();
 };
 
-// اعمال محدودیت روی تمام مسیرهای API
+// اعمال میدلورهای امنیتی روی مسیرهای حساس
 app.use('/send-otp', globalLimiter);
 
 
-app.post('/send-otp', secureAPI, async (req, res) => {
-    // 1. دریافت ساختار جدید از Body
+// ==========================================
+// 3. Routes
+// ==========================================
+
+app.post('/send-otp', ipWhitelist, secureAPI, async (req, res) => {
     const { phone, message, code, session_id } = req.body;
 
     if (!phone || (!message && !code)) {
@@ -57,7 +87,6 @@ app.post('/send-otp', secureAPI, async (req, res) => {
     }
 
     try {
-    
         let cleanPhone = String(phone).trim().replace(/^(?:\+|00)/, '');
         const formattedPhone = `${cleanPhone}@c.us`;
 
@@ -66,7 +95,6 @@ app.post('/send-otp', secureAPI, async (req, res) => {
             finalMessage = finalMessage ? `${finalMessage}${code}` : `${code}`;
         }
 
-        // 4. ارسال پیام با متد ایمن (Anti-Ban)
         await sendSecureMessage(session, formattedPhone, finalMessage);
         
         logger('success', `Message sent to ${cleanPhone} via [${targetId}]`);
@@ -83,7 +111,7 @@ app.post('/send-otp', secureAPI, async (req, res) => {
 });
 
 
-app.get('/status', secureAPI, (req, res) => {
+app.get('/status', ipWhitelist, secureAPI, (req, res) => {
     const activeSessionIds = process.env.SESSION_IDS ? process.env.SESSION_IDS.split(',') : [];
     const report = activeSessionIds.map(id => {
         const s = sessions.get(id);
@@ -97,9 +125,7 @@ app.get('/status', secureAPI, (req, res) => {
     res.json(report);
 });
 
-/**
- * مانیتورینگ سلامت سرویس (Health Check)
- */
+
 app.get('/health', (req, res) => {
     const uptime = process.uptime();
     res.status(200).json({
@@ -110,48 +136,50 @@ app.get('/health', (req, res) => {
     });
 });
 
-/**
- * حذف فیزیکی و منطقی سشن و آماده‌سازی برای راه‌اندازی مجدد
- */
-app.delete('/session/:id', secureAPI, async (req, res) => {
+
+app.delete('/session/:id', ipWhitelist, secureAPI, async (req, res) => {
     const sessionId = req.params.id;
     const session = sessions.get(sessionId);
     
     logger('command', `Manual delete request for session: [${sessionId}]`);
 
     try {
+        // 1. قطع اتصال نرم‌افزاری واتس‌اپ
         if (session) {
             await session.client.destroy().catch(() => {});
             sessions.delete(sessionId);
         }
 
+        // 2. حذف فیزیکی فایل‌های سشن به روش غیرهمگان (بدون setTimeout و rmSync)
         const sessionPath = path.join(__dirname, '.wwebjs_auth', `session-${sessionId}`);
-        if (fs.existsSync(sessionPath)) {
-            // ایجاد وقفه برای آزادسازی فایل‌ها در ویندوز و سپس حذف
-            setTimeout(() => {
-                try {
-                    fs.rmSync(sessionPath, { recursive: true, force: true });
-                    logger('system', `Directory for [${sessionId}] removed. Re-initializing...`);
-                    initializeSession(sessionId); // شروع مجدد برای دریافت QR جدید
-                } catch (e) {
-                    logger('error', `File cleanup failed: ${e.message}`);
-                }
-            }, 3000);
-        }
         
-        res.json({ success: true, message: `Session [${sessionId}] termination and cleanup initiated.` });
+        await fsPromises.access(sessionPath).catch(() => null); // بررسی وجود
+        await fsPromises.rm(sessionPath, { recursive: true, force: true });
+        logger('system', `Directory for [${sessionId}] removed successfully.`);
+
+        // 3. شروع مجدد فوری سشن برای دریافت کد QR جدید
+        initializeSession(sessionId);
+        
+        res.json({ success: true, message: `Session [${sessionId}] terminated and re-initializing for new QR.` });
     } catch (err) {
+        logger('error', `Session cleanup failed: ${err.message}`);
         res.status(500).json({ error: err.message });
     }
 });
 
 // ==========================================
-// 3. Global Error Handler & Start
+// 4. Global Error Handlers & Start
 // ==========================================
 
-// جلوگیری از کرش سرور در صورت بروز خطای پیش‌بینی نشده
+// جلوگیری از تبدیل سرور به حالت زامبی در صورت بروز خطای مهلک
 process.on('uncaughtException', (err) => {
     logger('fatal', `Uncaught Exception: ${err.message}`);
+    process.exit(1); // خروج اجباری تا PM2 آن را سالم ری‌استارت کند
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logger('fatal', `Unhandled Rejection at: ${promise} - Reason: ${reason}`);
+    process.exit(1);
 });
 
 const PORT = process.env.PORT || 30033;
@@ -159,12 +187,12 @@ app.listen(PORT, () => {
     logger('system', `------------------------------------------------`);
     logger('system', `WA-GATEWAY-SERVICE STARTED ON PORT ${PORT}`);
     logger('system', `DEBUG_MODE: ${process.env.DEBUG_MODE}`);
+    logger('system', `TRUST_PROXY: ENABLED`);
     logger('system', `------------------------------------------------`);
 
     // مقداردهی اولیه سشن‌ها
     const activeSessionIds = process.env.SESSION_IDS ? process.env.SESSION_IDS.split(',') : [];
     activeSessionIds.forEach((id, index) => {
-        // ایجاد فاصله زمانی بین استارت سشن‌ها برای جلوگیری از فشار ناگهانی به CPU/RAM
         setTimeout(() => initializeSession(id), index * 5000);
     });
 });
