@@ -37,6 +37,7 @@ const notifyLaravel = async (event, sessionId, data = {}) => {
 const sendSecureMessage = async (session, phone, message) => {
   const typingDelay = Math.min(message.length * 50, 3000);
   const randomExtraDelay = Math.floor(Math.random() * 1500) + 500;
+  const totalWait = typingDelay + randomExtraDelay;
 
   logger("debug", `Anti-Ban: Simulating typing for ${totalWait}ms...`);
   await delay(totalWait);

@@ -1,8 +1,9 @@
 # 🚀 WA-Gateway-Service: راهکار جامع و سازمانی مدیریت نشست‌های واتس‌اپ
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.1.0-blue.svg" alt="Version">
+  <img src="https://img.shields.io/badge/version-2.2.0-blue.svg" alt="Version">
   <img src="https://img.shields.io/badge/Node.js-v18+-green.svg" alt="Node.js">
+  <img src="https://img.shields.io/badge/Proxy-GAS_Bypass-red.svg" alt="GAS Proxy">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
   <img src="https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg" alt="Status">
   <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20Ubuntu-lightgrey.svg" alt="Platform">
@@ -17,13 +18,15 @@
 - [🏗 معماری سیستم](#-معماری-سیستم)
 - [📱 آماده‌سازی گوشی](#-گام-اول-آمادهسازی-حیاتی-گوشی-موبایل)
 - [📂 ساختار پروژه](#-ساختار-پوشهبندی-پروژه)
-- [🛠 نصب و راه‌اندازی](#-نصب-و-راهاندازی)
+- [🛠 نصب و راه‌اندازی سرور خارج](#-نصب-و-راهاندازی-سرور-خارج)
+- [🌐 اتصال از بک‌اند داخلی (پروکسی گوگل اسکریپت)](#-اتصال-از-بکاند-داخلی-پروکسی-گوگل-اسکریپت)
 - [⚙️ پیکربندی](#️-متغیرهای-فایل-تنظیمات-env)
-- [📡 مستندات API](#-مستندات-کامل-api)
+- [📡 مستندات API مستقیم](#-مستندات-کامل-api)
 - [🔗 وب‌هوک‌ها](#-مستندات-وبهوک-webhooks)
 - [🔒 امنیت](#-امنیت)
-- [❓ سوالات متداول](#-سوالات-متداول-faq)
-- [🤝 مشارکت](#-مشارکت-در-توسعه)
+- [🚀 اجرا در محیط عملیاتی](#-اجرا-در-محیط-عملیاتی-production)
+- [❓ سوالات متداول (FAQ)](#-سوالات-متداول-faq)
+- [🤝 مشارکت در توسعه](#-مشارکت-در-توسعه)
 - [📄 لایسنس](#-لایسنس)
 
 ---
@@ -42,9 +45,9 @@
 | 🚫 **تحریم سرویس‌دهنده‌ها** | مالکیت ۱۰۰٪ زیرساخت | عدم وابستگی به Twilio و مشابهان |
 | 📉 **نرخ تحویل پایین پیامک** | ارسال از طریق واتس‌اپ | نرخ تحویل نزدیک به **۱۰۰٪** |
 | ⛔ **ریسک مسدود شدن** | موتور ضد-بلاک هوشمند | شبیه‌سازی رفتار انسانی |
+| 🌐 **قطعی ارتباط (ECONNRESET)** | پروکسی اختصاصی Google Apps Script | اتصال پایدار از سرورهای داخلی (ایران) به خارج |
 
 ### 🎯 موارد استفاده:
-
 - ✅ ارسال کد تایید (OTP) به شماره‌های بین‌المللی
 - ✅ اطلاع‌رسانی خودکار به کاربران
 - ✅ پشتیبانی از چندین خطوط همزمان
@@ -64,29 +67,35 @@
 ### 🔢 قالب‌بندی کدهای تایید (OTP Formatter)
 امکان ارسال مجزای متن پیام و کد تایید؛ سیستم کد را به صورت **Bold** در انتهای پیام ترکیب می‌کند.
 
+### 🌐 پروکسی اختصاصی گوگل (Anti-Filter Proxy)
+بهینه‌سازی شده برای عبور از محدودیت‌های شبکه‌ای و فیلترینگ بدون نیاز به سرور واسط اضافی یا VPN. (جزئیات در بخش مربوطه)
+
 ### 📡 پشتیبانی کامل از وب‌هوک (Webhook)
-ارسال گزارش لحظه‌ای رویدادها (وصل شدن، قطع شدن، تولید QR) به آدرس URL دلخواه شما.
+ارسال گزارش لحظه‌ای رویدادها (وصل شدن، قطع شدن، تولید QR با تصویر Base64) به آدرس URL دلخواه شما.
 
 ### 📊 مانیتورینگ پیشرفته
 مشاهده وضعیت مصرف RAM، زمان آنلاین بودن و سلامت لحظه‌ای خطوط.
 
 ### 🛡️ امنیت لایه‌بندی شده
-محافظت از تمام مسیرها با X-API-KEY و قابلیت Trust Proxy برای کارکرد پشت Nginx.
+محافظت از تمام مسیرها با `X-API-KEY`، قابلیت `IP Whitelist` و `Trust Proxy` برای کارکرد صحیح پشت Nginx.
 
 ### 🧹 پاکسازی خودکار
 مکانیزم هوشمند حذف کش و فایل‌های موقت در صورت بروز خطا برای آماده‌سازی اسکن مجدد.
 
 ### 🤖 موتور ضد-بلاک (Anti-Ban Engine)
-- شبیه‌سازی رفتار انسانی (Human-like Typing)
+- شبیه‌سازی رفتار انسانی (محاسبه زمان تایپ بر اساس طول متن)
 - ایجاد تأخیرهای تصادفی هوشمند
 - مدیریت نرخ ارسال (Rate Limiting)
-- تشخیص و جلوگیری از الگوهای رباتیک
+- جلوگیری از ارسال پشت سر هم توسط یک سشن
 
 ---
 
 ## 🏗 معماری سیستم
 
-```
+معماری فعلی از دو مسیر ارتباطی پشتیبانی می‌کند تا پایداری ۱۰۰٪ در هر شرایط جغرافیایی تضمین شود:
+
+### ۱. ارتباط مستقیم (برای سرورهای خارجی)
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                    Client Applications                       │
 │         (Laravel / Python / Java / Mobile Apps)             │
@@ -119,6 +128,21 @@
 └─────────────────────────────────────────────────────────────┘
 ```
 
+### ۲. ارتباط از طریق پروکسی (برای سرورهای داخلی/ایران)
+به دلیل مسدود بودن ارتباط‌های مستقیم با هدرهای کاستوم از داخل ایران، از Google Apps Script به عنوان یک پل (Bridge) استفاده می‌شود:
+
+```text
+┌─────────────────────┐        ┌──────────────────────┐        ┌─────────────────────┐
+│  سرور داخلی (ایران) │        │  Google Apps Script  │        │  سرور خارج (مثلا آلمان)  │
+│    (Laravel / PHP)   │ ────▶ │   (Proxy Layer)      │ ────▶ │   (Node.js / WA)    │
+└─────────────────────┘        └──────────────────────┘        └──────────┬──────────┘
+                                                                         │
+                                                                         ▼
+                                                               ┌─────────────────────┐
+                                                               │   WhatsApp Web API  │
+                                                               └─────────────────────┘
+```
+
 ---
 
 ## 📱 گام اول: آماده‌سازی حیاتی گوشی موبایل
@@ -135,7 +159,6 @@
 | 4 | **پاکسازی Linked Devices** | تمام سشن‌های قبلی و غیرضروری را پاک کنید | 🟡 توصیه شده |
 
 ### 📱 مراحل تنظیم Battery Optimization:
-
 ```
 Settings → Apps → WhatsApp → Battery 
 → Select "Don't optimize" یا "Unrestricted"
@@ -149,16 +172,16 @@ Settings → Apps → WhatsApp → Battery
 /opt/WA-Gateway-Service/          # مسیر استاندارد نصب در لینوکس
 │
 ├── 📁 helpers/                    # توابع کمکی و لاگر حرفه‌ای
-│   └── logger.js                  # مدیریت ثبت وقایع در فایل و کنسول
+│   └── logger.js                  # مدیریت ثبت وقایع غیرهمگان (Non-blocking) برای جلوگیری از فریز سرور
 │
 ├── 📁 services/                   # هسته پردازشی واتس‌اپ
-│   └── whatsapp.js                # منطق اتصال، رویدادها و ضد-بلاک
+│   └── whatsapp.js                # منطق اتصال، ریکاوری خودکار قطعی، ضد-بلاک و تولید QR Base64
 │
-├── 📁 .wwebjs_auth/               # محل ذخیره توکن‌های ورود (غیرقابل دسترسی از وب)
+├── 📁 .wwebjs_auth/               # محل ذخیره توکن‌های ورود (ایزوله برای هر سشن - غیرقابل دسترسی از وب)
 │
-├── 📄 server.js                   # نقطه شروع برنامه و تعاریف API
+├── 📄 server.js                   # نقطه شروع برنامه، APIها، IP Whitelist و مدیریت خطاهای مهلک
 ├── 📄 wa-gateway-service.sh       # اسکریپت نصب تمام‌خودکار (Enterprise)
-├── 📄 ecosystem.config.js         # تنظیمات مدیریت فرآیند PM2
+├── 📄 ecosystem.config.js         # تنظیمات مدیریت فرآیند PM2 (حداقل 1G RAM)
 ├── 📄 .env                        # متغیرهای حساس و کلیدهای امنیتی
 │
 ├── 📄 package.json                # وابستگی‌های پروژه
@@ -168,22 +191,21 @@ Settings → Apps → WhatsApp → Battery
 
 ---
 
-## 🛠 نصب و راه‌اندازی
+## 🛠 نصب و راه‌اندازی سرور خارج
+
+*(این مرحله فقط روی یک سرور خارج از ایران مثلاً آلمان/هلند انجام می‌شود)*
 
 ### 📋 پیش‌نیازها:
-
 - **سیستم عامل:** Ubuntu 20.04+ / Debian 11+
 - **Node.js:** نسخه 18 یا بالاتر
 - **PM2:** Process Manager برای Node.js
 - **Nginx:** (اختیاری) برای Reverse Proxy و SSL
-- **حافظه RAM:** حداقل 1GB (برای هر سشن)
+- **حافظه RAM:** حداقل **1 گیگابایت** (بسیار مهم برای اجرای مرورگر پشت پرده واتس‌اپ)
 
 ---
 
 ### ۱. روش نصب خودکار (توصیه شده ⭐)
-
 اسکریپت Bash طراحی شده تمامی پیش‌نیازها را به صورت خودکار نصب می‌کند:
-
 ```bash
 # کلون کردن مخزن
 git clone https://github.com/mmozani/WA-Gateway-Service.git
@@ -193,12 +215,10 @@ cd WA-Gateway-Service
 sudo chmod +x wa-gateway-service.sh
 sudo ./wa-gateway-service.sh
 ```
-
 #### ✨ این اسکریپت چه کارهایی انجام می‌دهد:
-
 - [ ] نصب Node.js نسخه 20 LTS
 - [ ] نصب PM2 Process Manager
-- [ ] نصب کتابخانه‌های گرافیکی Chromium (`libasound2t64` و ...)
+- [ ] نصب کتابخانه‌های گرافیکی Chromium
 - [ ] کپی پروژه به `/opt/WA-Gateway-Service`
 - [ ] نصب وابستگی‌های npm
 - [ ] ایجاد فایل `.env` نمونه
@@ -207,7 +227,6 @@ sudo ./wa-gateway-service.sh
 ---
 
 ### ۲. روش نصب دستی
-
 ```bash
 # ۱. نصب Node.js (اگر ندارید)
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -239,9 +258,7 @@ pm2 startup
 ---
 
 ### ۳. پیکربندی Nginx (اختیاری اما توصیه شده)
-
 برای استفاده از دامنه و SSL، از بلاک زیر در تنظیمات Nginx استفاده کنید:
-
 ```nginx
 server {
     listen 443 ssl http2;
@@ -288,7 +305,6 @@ server {
 ## 📸 نحوه اسکن کد QR و راه‌اندازی خطوط
 
 ### 🔄 مراحل اتصال:
-
 ```
 ┌─────────────────┐      ┌─────────────────┐      ┌─────────────────┐
 │   ۱. مشاهده لاگ  │ ──▶ │  ۲. اسکن QR     │ ──▶ │  ۳. تأیید جلسه  │
@@ -297,7 +313,6 @@ server {
 ```
 
 ### 📝 دستورالعمل گام‌به‌گام:
-
 ```bash
 # ۱. مشاهده لاگ‌های زنده
 pm2 logs wa-gateway
@@ -307,9 +322,7 @@ pm2 logs wa-gateway
 # [WA-Gateway] 📱 Scan this QR with your phone:
 # [QR CODE WILL APPEAR HERE]
 ```
-
 **مراحل اسکن:**
-
 1. ☝️ گوشی خود را بردارید
 2. 📱 وارد اپلیکیشن واتس‌اپ شوید
 3. ⚙️ به بخش **Linked Devices** بروید
@@ -318,6 +331,111 @@ pm2 logs wa-gateway
 6. ✅ پیام `Session is READY. Number: 989XXXXXXXXX` را مشاهده خواهید کرد
 
 > 💡 **نکته:** اطلاعات ورود ذخیره شده و برای دفعات بعد نیازی به اسکن مجدد نیست.
+
+---
+
+## 🌐 اتصال از بک‌اند داخلی (پروکسی گوگل اسکریپت)
+
+اگر بک‌اند شما (مثلاً لاراول) روی سروری در **ایران** قرار دارد، به دلیل مسدود بودن ارتباط‌های مستقیم با هدرهای کاستوم، درخواست مستقیم به سرور خارج با ارور `ECONNRESET` قطع می‌شود. برای حل قطعی این مشکل از Google Apps Script استفاده می‌کنیم.
+
+### مرحله ۱: ساخت پروکسی در گوگل اسکریپت
+1. به [script.google.com](https://script.google.com/) بروید و یک پروژه جدید بسازید.
+2. کدهای زیر را در آن پیست کنید (مقادیر `PROXY_SECRET` و `TARGET_BASE_URL` را تغییر دهید):
+
+```javascript
+var PROXY_SECRET = "YOUR_SECURE_PROXY_SECRET_HERE"; // یک رمز قوی بسازید
+var TARGET_BASE_URL = "https://Wa-OTP.Your-Server.com";     // آدرس سرور خارجی شما
+
+function doPost(e) {
+  if (typeof e !== 'undefined') return handlePostRequest(e);
+}
+
+function doGet(e) {
+  if (typeof e !== 'undefined') return handleGetRequest(e);
+}
+
+function handlePostRequest(e) {
+  if (e.parameter.secret !== PROXY_SECRET) {
+    return ContentService.createTextOutput(JSON.stringify({ error: "Forbidden" }));
+  }
+
+  var path = e.parameter.path || "/send-otp";
+  var targetUrl = TARGET_BASE_URL + path;
+  var waApiKey = e.parameter.api_key || "";
+  var payloadData = e.parameter.body || "{}";
+  
+  var options = {
+    'method': 'post',
+    'contentType': 'application/json',
+    'payload': payloadData,
+    'headers': { 'X-API-KEY': waApiKey },
+    'muteHttpExceptions': true
+  };
+
+  var res = UrlFetchApp.fetch(targetUrl, options);
+  return ContentService.createTextOutput(res.getContentText());
+}
+
+function handleGetRequest(e) {
+  if (e.parameter.secret !== PROXY_SECRET) {
+    return ContentService.createTextOutput(JSON.stringify({ error: "Forbidden" }));
+  }
+
+  var path = e.parameter.path || "/health";
+  var targetUrl = TARGET_BASE_URL + path;
+  var waApiKey = e.parameter.api_key || "";
+
+  var options = {
+    'method': 'get',
+    'headers': { 'X-API-KEY': waApiKey },
+    'muteHttpExceptions': true
+  };
+
+  var res = UrlFetchApp.fetch(targetUrl, options);
+  return ContentService.createTextOutput(res.getContentText());
+}
+```
+
+3. از منوی **Deploy** > **New deployment** > نوع **Web app** را انتخاب کنید.
+4. در بخش **Who has access** حتماً گزینه **Anyone** را انتخاب کرده و دیپلوی کنید.
+5. **آدرس `.../exec`** تولید شده را کپی کنید.
+
+### مرحله ۲: استفاده در لاراول / PHP (کد آماده)
+در سرور ایران خود، به هیچ وجه از `Http::post` لاراول یا هدرهای مستقیم استفاده نکنید. دقیقاً از ساختار cURL زیر استفاده کنید:
+
+```php
+$proxyUrl = "https://script.google.com/macros/s/YOUR_EXEC_ID/exec";
+$jsonData = json_encode([
+    "phone" => "+989123456789",
+    "message" => "Your Code is: ",
+    "code" => "123456",
+    "session_id" => "primary"
+]);
+
+// ترفند حیاتی: استفاده از http_build_query
+$fullUrl = $proxyUrl . "?" . http_build_query([
+    'secret'  => 'YOUR_SECURE_PROXY_SECRET_HERE',
+    'path'    => '/send-otp',
+    'api_key' => 'YOUR_WA_API_KEY',
+    'body'    => $jsonData
+]);
+
+$ch = curl_init($fullUrl);
+curl_setopt($ch, CURLOPT_POST, true);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true); // بسیار مهم
+$response = curl_exec($ch);
+curl_close($ch);
+
+$result = json_decode($response, true);
+
+// ⚠️ تله گوگل اسکریپت: همیشه کد 200 برمی‌گرداند، حتما داخل جیسون را چک کنید!
+if (isset($result['success']) && $result['success'] === true) {
+    // ارسال موفق
+} else {
+    // ارور در $result['error']
+}
+```
 
 ---
 
@@ -331,16 +449,19 @@ pm2 logs wa-gateway
 # Server Configuration
 PORT=30033                          # پورت اجرای سرویس
 NODE_ENV=production                 # محیط اجرایی (development/production)
+TRUST_PROXY=1                       # عدد 1 یا true بگذارید تا آی‌پی واقعی پشت Nginx شناسایی شود
 
 # Security
-SECRET_API_KEY=your-secret-key-here  # کلید امنیتی برای API (تغییر دهید!)
-TRUST_PROXY=1                       # فعال‌سازی Trust Proxy برای Nginx
+# ⚠️ نکته مهم: کلید API را بدون دابل کوتیشن " " بنویسید تا مشکل هدر پیش نیاید
+SECRET_API_KEY=YOUR-SECRET_API_KEY
+ALLOWED_IPS=127.0.0.1,::1,192.168.  # لیست آی‌پی‌های مجاز
+IGNORE_IP_WHITELIST=true            # برای غیرفعال کردن محدودیت آی‌پی (true/false)
 
 # Sessions
 SESSION_IDS=primary,second           # نام سشن‌ها (با کاما جدا شوند)
 
 # Webhook
-WEBHOOK_URL=https://your-domain.com/webhook  # آدرس دریافت رویدادها
+WEBHOOK_URL=https://your-domain.com/webhook  # آدرس دریافت رویدادها (اگر سرور ایران است، خالی بگذارید)
 
 # Anti-Ban Settings
 TYPING_DELAY_MIN=1000               # حداقل تأخیر تایپ (میلی‌ثانیه)
@@ -359,8 +480,9 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 
 ## 📡 مستندات کامل API
 
-### 🔐 احراز هویت
+*(این مستندات برای درخواست‌های مستقیم از خارج از ایران است. اگر در ایران هستید از بخش پروکسی گوگل اسکریپت استفاده کنید).*
 
+### 🔐 احراز هویت
 تمامی درخواست‌ها نیاز به هدر زیر دارند:
 
 | Header | Value | Description |
@@ -371,16 +493,13 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ---
 
 ### ۱. ارسال پیام OTP
-
 **POST** `/send-otp`
-
 ارسال کد تایید به شماره موبایل مشخص شده.
 
 #### Request Body:
-
 ```json
 {
-  "phone": "+989120209504",
+  "phone": "++989123456789",
   "message": "کد ورود شما:",
   "code": "1234",
   "session_id": "primary"
@@ -388,7 +507,6 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ```
 
 #### Parameters:
-
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `phone` | string | ✅ Yes | شماره موبایل مقصد (با یا بدون پیشوند) |
@@ -397,21 +515,16 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 | `session_id` | string | ❌ No | شناسه سشن (پیش‌فرض: primary) |
 
 #### Success Response (200):
-
 ```json
 {
   "success": true,
-  "message": "Message sent successfully",
-  "data": {
-    "to": "+989120209504",
-    "session": "primary",
-    "timestamp": "2024-01-15T10:30:00Z"
-  }
+  "via": "primary",
+  "sender": "989151112233",
+  "status": "Sent"
 }
 ```
 
 #### Error Response (400/401/500):
-
 ```json
 {
   "success": false,
@@ -422,13 +535,10 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ---
 
 ### ۲. مشاهده وضعیت خطوط
-
 **GET** `/status`
-
 دریافت لیست تمام سشن‌ها و وضعیت آن‌ها.
 
 #### Response (200):
-
 ```json
 {
   "success": true,
@@ -436,16 +546,8 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
     {
       "id": "primary",
       "status": "READY",
-      "number": "+989120209504",
-      "uptime": "2d 5h 30m",
-      "last_activity": "2024-01-15T10:29:45Z"
-    },
-    {
-      "id": "second",
-      "status": "OFFLINE",
-      "number": null,
-      "uptime": null,
-      "last_activity": null
+      "number": "989151112233",
+      "ready_since": "2026-04-15T10:29:45Z"
     }
   ]
 }
@@ -454,47 +556,31 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ---
 
 ### ۳. مانیتورینگ سلامت سرور
-
-**GET** `/health`
-
+**GET** `/health` *(نیاز به API Key ندارد)*
 بررسی سلامت سرویس و منابع سیستم.
 
 #### Response (200):
-
 ```json
 {
-  "status": "healthy",
-  "uptime": "172800 seconds",
-  "memory": {
-    "used_mb": 256,
-    "total_mb": 1024,
-    "percentage": 25
-  },
-  "sessions": {
-    "total": 2,
-    "active": 1,
-    "offline": 1
-  },
-  "timestamp": "2024-01-15T10:30:00Z"
+  "status": "UP",
+  "uptime": "45h 12m",
+  "memory_usage": "245 MB",
+  "timestamp": "2026-04-15T10:30:00Z"
 }
 ```
 
 ---
 
 ### ۴. حذف سشن و آماده‌سازی مجدد
-
 **DELETE** `/session/:id`
-
 قطع اتصال، پاکسازی کش و آماده‌سازی برای اسکن جدید.
 
 #### Parameters:
-
 | Parameter | Type | Location | Description |
 |-----------|------|----------|-------------|
 | `id` | string | URL Path | شناسه سشن |
 
 #### Response (200):
-
 ```json
 {
   "success": true,
@@ -511,12 +597,11 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ### 📥 رویدادهای دریافتی:
 
 #### ۱. تولید کد QR (برای نمایش در پنل)
-
 ```json
 {
   "event": "qr",
   "session": "primary",
-  "timestamp": "2024-01-15T10:25:00Z",
+  "timestamp": "2026-04-15T10:25:00Z",
   "data": {
     "qr": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...",
     "expires_in": 20
@@ -525,25 +610,23 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ```
 
 #### ۲. احراز هویت موفق
-
 ```json
 {
   "event": "authenticated",
   "session": "primary",
-  "timestamp": "2024-01-15T10:26:30Z",
+  "timestamp": "2026-04-15T10:26:30Z",
   "data": {
-    "number": "+989120209504"
+    "number": "++989123456789"
   }
 }
 ```
 
 #### ۳. قطع اتصال
-
 ```json
 {
   "event": "disconnected",
   "session": "primary",
-  "timestamp": "2024-01-15T10:28:00Z",
+  "timestamp": "2026-04-15T10:28:00Z",
   "data": {
     "reason": "connection_closed"
   }
@@ -551,18 +634,19 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ```
 
 #### ۴. ارسال موفق پیام
-
 ```json
 {
   "event": "message_sent",
   "session": "primary",
-  "timestamp": "2024-01-15T10:30:00Z",
+  "timestamp": "2026-04-15T10:30:00Z",
   "data": {
     "to": "+989123456789",
     "message_id": "true_989123456789@c.us_3EBxxxxxxx"
   }
 }
 ```
+
+> ⚠️ **نکته مهم برای سرورهای ایران:** اگر وب‌هوک روی سرور ایران باشد، ممکن است به دلیل محدودیت‌های شبکه دریافت نشود. پیشنهاد می‌شود وب‌هوک خاموش بماند و بک‌اند ایران با متد `/status` وضعیت را چک کند (Pooling).
 
 ---
 
@@ -576,21 +660,24 @@ HEALTH_CHECK_INTERVAL=30000         # فاصله سلامت‌سنجی (میلی
 ├─────────────────────────────────────┤
 │  Layer 2: Rate Limiting             │ ← Anti-Ban Engine
 ├─────────────────────────────────────┤
-│  Layer 3: Input Validation          │ ← Smart Sanitization
+│  Layer 3: IP Whitelist              │ ← فیلتر آی‌پی‌های مجاز
 ├─────────────────────────────────────┤
-│  Layer 4: Secure Storage            │ ← Encrypted Auth Tokens
+│  Layer 4: Input Validation          │ ← Smart Sanitization
 ├─────────────────────────────────────┤
-│  Layer 5: Network Security          │ ← HTTPS + Nginx Hardening
+│  Layer 5: Secure Storage            │ ← Encrypted Auth Tokens
+├─────────────────────────────────────┤
+│  Layer 6: Network Security          │ ← HTTPS + Nginx Hardening
+├─────────────────────────────────────┤
+│  Layer 7: Fatal Error Handling      │ ← خروج اجباری (Process Exit) در ارورهای مهلک
 └─────────────────────────────────────┘
 ```
 
 ### ✅ بهترین شیوه‌ها:
-
-1. **تغییر کلید API:** همیشه مقدار `SECRET_API_KEY` را تغییر دهید
-2. **استفاده از HTTPS:** همیشه از SSL/TLS استفاده کنید
-3. **محدود کردن دسترسی:** فقط IPهای مجاز به API دسترسی داشته باشند
-4. **به‌روزرسانی:** همیشه آخرین نسخه را استفاده کنید
-5. **لاگ‌برداری:** لاگ‌ها را بررسی و نظارت کنید
+1. **تغییر کلید API:** همیشه مقدار `SECRET_API_KEY` را تغییر دهید (بدون دابل کوتیشن).
+2. **استفاده از HTTPS:** همیشه از SSL/TLS استفاده کنید.
+3. **محدود کردن دسترسی:** فقط IPهای مجاز به API دسترسی داشته باشند.
+4. **به‌روزرسانی:** همیشه آخرین نسخه را استفاده کنید.
+5. **لاگ‌برداری:** لاگ‌ها را بررسی و نظارت کنید.
 
 ---
 
@@ -647,8 +734,13 @@ top -bn1 | head -20
 
 ## ❓ سوالات متداول (FAQ)
 
-### ❓ **س: اگر شماره من مسدود (Ban) شد چکار کنم؟**
+### ❓ **س: در سرور ایران ارور `Recv failure: Connection was reset` می‌گیرم!**
+**ج:** فایروال ایران درخواست‌های مستقیم با هدرهای کاستوم را مسدود می‌کند. حتماً از روش **پروکسی Google Apps Script** و متد `http_build_query` در PHP استفاده کنید (راهنمای کامل در همین README وجود دارد).
 
+### ❓ **س: ارور `Execution context was destroyed` در سرور خارج اتفاق می‌افتد.**
+**ج:** دو دلیل دارد: ۱. مقدار `max_memory_restart` در فایل `ecosystem.config.js` زیر 1 گیگابایت است (حتماً روی `'1G'` بگذارید). ۲. فایل‌های کش واتس‌اپ خراب شده‌اند (سشن را از طریق API حذف و دوباره QR بزنید).
+
+### ❓ **س: اگر شماره من مسدود (Ban) شد چکار کنم؟**
 **ج:** 
 1. سشن را با متد `DELETE /session/:id` پاک کنید
 2. حداقل ۲۴ ساعت صبر کنید
@@ -656,36 +748,27 @@ top -bn1 | head -20
 4. فاصله زمانی ارسال‌ها را در تنظیمات بررسی کنید
 5. مطمئن شوید موتور ضد-بلاک فعال است
 
----
-
 ### ❓ **س: چرا خطای ERR_ERL_UNEXPECTED_X_FORWARDED_FOR دریافت می‌کنم؟**
-
 **ج:** 
 - اگر سرویس را پشت Nginx قرار داده‌اید، مطمئن شوید خط `app.set('trust proxy', 1);` در فایل `server.js` فعال است
 - یا متغیر `TRUST_PROXY=1` را در فایل `.env` تنظیم کنید
 
----
-
 ### ❓ **س: چرا کد QR در ترمینال نمایش داده نمی‌شود؟**
-
 **ج:** 
 - مطمئن شوید کتابخانه‌های گرافیکی اوبونتو نصب شده‌اند
 - اسکریپت نصب خودکار را دوباره اجرا کنید: `sudo ./wa-gateway-service.sh`
 - یا دستی نصب کنید: `sudo apt install -y libasound2t64 libatk-bridge2.0-0 libcups2`
 
----
+### ❓ **س: پاسخ گوگل اسکریپت در PHP همیشه با موفقیت ارسال می‌شود اما پیام واتس‌اپ نمی‌رود!**
+**ج:** این یک ویژگی عجیب گوگل اسکریپت است. گوگل حتی در صورت ارور 500 از سرور خارجی، به شما کد `200 OK` برمی‌گرداند. **هرگز به کد وضعیت cURL اعتماد نکنید**، حتماً مقدار `$result['success']` را داخل JSON چک کنید.
 
 ### ❓ **س: آیا می‌توانم چندین شماره را همزمان مدیریت کنم؟**
-
 **ج:** 
 - بله! کافی است متغیر `SESSION_IDS` را در فایل `.env` تنظیم کنید
 - مثال: `SESSION_IDS=sales,support,marketing`
 - هر سشن نیاز به اسکن QR جداگانه دارد
 
----
-
 ### ❓ **س: چگونه می‌توانم اطمینان حاصل کنم که سرویس پس از ریبوت سرور اجرا می‌شود؟**
-
 **ج:** 
 ```bash
 pm2 save
@@ -693,10 +776,7 @@ pm2 startup
 ```
 این دستورات PM2 را به عنوان systemd service ثبت می‌کنند.
 
----
-
 ### ❓ **س: آیا این سرویس برای محیط Production مناسب است؟**
-
 **ج:** 
 - بله! این سرویس برای محیط Production طراحی شده است
 - ویژگی‌هایی مانند: PM2 process manager، Auto-restart، Logging، Health monitoring
@@ -709,7 +789,6 @@ pm2 startup
 ما از مشارکت شما استقبال می‌کنیم! 🎉
 
 ### 📝 نحوه مشارکت:
-
 1. 🍴 Fork پروژه را Fork کنید
 2. 🌿 یک Branch جدید بسازید: `git checkout -b feature/AmazingFeature`
 3. ✅ تغییراتتان را Commit کنید: `git commit -m 'Add some AmazingFeature'`
@@ -717,14 +796,13 @@ pm2 startup
 5. 🔀 یک Pull Request باز کنید
 
 ### 🐛 گزارش باگ:
-
 از طریق [Issues](https://github.com/mmozani/WA-Gateway-Service/issues) باگ را گزارش دهید.
 
 ---
 
 ## 👨‍💻 نویسنده
 
-**[Mohammad Mozani](https://github.com/mmozani)**
+**[MMozani](https://github.com/mmozani)**
 
 - 📧 Email: [mozani@parsian.digital](mailto:mozani@parsian.digital)
 - 💼 GitHub: [@mmozani](https://github.com/mmozani)
@@ -746,7 +824,7 @@ pm2 startup
 ```
 MIT License
 
-Copyright (c) 2024 Mohammad Mozani
+Copyright (c) 2026 Mohamad Mozani
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -773,7 +851,7 @@ SOFTWARE.
 
 ### ⭐ اگر این پروژه به شما کمک کرد، لطفاً Star کنید! ⭐
 
-**توسعه داده شده با ❤️ برای جامعه برنامه‌نویسان ایران**
+**توسعه داده شده با ❤️ برای جامعه برنامه‌نویسان ایران 🇮🇷**
 
 [![Star History Chart](https://api.star-history.com/svg?repos=mmozani/WA-Gateway-Service&type=Date)](https://star-history.com/#mmozani/WA-Gateway-Service&Date)
 
@@ -791,6 +869,7 @@ SOFTWARE.
 
 <div align="center">
 
-**© 2026 WA-Gateway-Service. Made with ❤️ in Iran 🇮🇷**
+**© 2026 WA-Gateway-Service. Made with ❤️ in Parsian Digital Company In Iran 🇮🇷**
 
 </div>
+```
