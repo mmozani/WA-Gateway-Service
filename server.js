@@ -1,209 +1,775 @@
-require("dotenv").config();
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const fs = require("fs");
-const fsPromises = require("fs").promises;
-const path = require("path");
-const logger = require("./helpers/logger");
+const crypto =
+  require("crypto");
+
+const express =
+  require("express");
+
 const {
-  sessions,
-  initializeSession,
-  sendSecureMessage,
-} = require("./services/whatsapp");
-
-const app = express();
-app.use(express.json());
-
-app.set(
-  "trust proxy",
-  process.env.TRUST_PROXY === "false" || process.env.TRUST_PROXY === "0"
-    ? false
-    : 1,
+  rateLimit,
+} = require(
+  "express-rate-limit",
 );
 
-const globalLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 30,
-  message: { error: "Too many requests, please try again later." },
-});
+const config =
+  require("./config");
 
-const ipWhitelist = (req, res, next) => {
-  if (process.env.IGNORE_IP_WHITELIST === "true") return next();
+const logger =
+  require("./helpers/logger");
 
-  const allowedIps = (process.env.ALLOWED_IPS || "")
-    .split(",")
-    .map((ip) => ip.trim())
-    .filter(Boolean);
-  if (allowedIps.length === 0) return next();
+const {
+  bearerAuth,
+} = require(
+  "./middleware/auth",
+);
 
-  const clientIp = req.ip;
+const {
+  executeOnce,
+} = require(
+  "./services/dedupe",
+);
 
-  const isAllowed = allowedIps.some((allowedIp) =>
-    clientIp.startsWith(allowedIp),
+const {
+  buildOtpMessage,
+} = require(
+  "./templates/otp",
+);
+
+const {
+  initializeSession,
+  sendOtpMessage,
+  getSessionReport,
+  getReadiness,
+  shutdownSessions,
+} = require(
+  "./services/whatsapp",
+);
+
+const app = express();
+
+app.disable(
+  "x-powered-by",
+);
+
+/*
+ * Node is intentionally bound to localhost.
+ * Nginx/TLS will be added in deployment.
+ */
+app.set(
+  "trust proxy",
+  false,
+);
+
+app.use(
+  (req, res, next) => {
+    req.requestId =
+      crypto.randomUUID();
+
+    res.setHeader(
+      "X-Request-ID",
+      req.requestId,
+    );
+
+    res.setHeader(
+      "Cache-Control",
+      "no-store",
+    );
+
+    res.setHeader(
+      "X-Content-Type-Options",
+      "nosniff",
+    );
+
+    res.setHeader(
+      "Referrer-Policy",
+      "no-referrer",
+    );
+
+    next();
+  },
+);
+
+app.use(
+  express.json({
+    limit:
+      config.server.bodyLimit,
+    strict: true,
+  }),
+);
+
+function errorBody(
+  req,
+  code,
+  message,
+) {
+  return {
+    ok: false,
+    request_id:
+      req.requestId,
+    error: {
+      code,
+      message,
+    },
+  };
+}
+
+function sendError(
+  req,
+  res,
+  httpStatus,
+  code,
+  message,
+) {
+  return res
+    .status(httpStatus)
+    .json(
+      errorBody(
+        req,
+        code,
+        message,
+      ),
+    );
+}
+
+function validateOtpRequest(
+  req,
+  res,
+  next,
+) {
+  if (
+    !req.is("application/json")
+  ) {
+    return sendError(
+      req,
+      res,
+      415,
+      "UNSUPPORTED_MEDIA_TYPE",
+      "Content-Type must be application/json",
+    );
+  }
+
+  const body =
+    req.body;
+
+  if (
+    !body ||
+    typeof body !== "object" ||
+    Array.isArray(body)
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_REQUEST",
+      "Invalid request body",
+    );
+  }
+
+  const allowedFields =
+    new Set([
+      "phone",
+      "code",
+      "locale",
+    ]);
+
+  const unknownFields =
+    Object.keys(body)
+      .filter(
+        (key) =>
+          !allowedFields.has(key),
+      );
+
+  if (
+    unknownFields.length > 0
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_REQUEST",
+      "Request contains unsupported fields",
+    );
+  }
+
+  if (
+    typeof body.phone !== "string"
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_PHONE",
+      "Phone must be a string in E.164 format",
+    );
+  }
+
+  const phone =
+    body.phone.trim();
+
+  if (
+    !/^\+[1-9][0-9]{7,14}$/.test(
+      phone,
+    )
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_PHONE",
+      "Phone must be in E.164 format",
+    );
+  }
+
+  if (
+    typeof body.code !== "string"
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_OTP_CODE",
+      "OTP code must be a string",
+    );
+  }
+
+  const code =
+    body.code.trim();
+
+  if (
+    !/^[0-9]{4,8}$/.test(
+      code,
+    )
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_OTP_CODE",
+      "OTP code must contain 4 to 8 digits",
+    );
+  }
+
+  const locale =
+    typeof body.locale === "string"
+      ? body.locale
+          .trim()
+          .toLowerCase()
+      : "en";
+
+  if (
+    ![
+      "fa",
+      "ar",
+      "en",
+    ].includes(locale)
+  ) {
+    return sendError(
+      req,
+      res,
+      422,
+      "INVALID_LOCALE",
+      "Supported locales are fa, ar and en",
+    );
+  }
+
+  req.otp = {
+    phone,
+    code,
+    locale,
+  };
+
+  next();
+}
+
+const otpGlobalLimiter =
+  rateLimit({
+    windowMs:
+      60 * 1000,
+
+    limit:
+      config.delivery
+        .globalPerMinute,
+
+    standardHeaders:
+      "draft-8",
+
+    legacyHeaders:
+      false,
+
+    keyGenerator:
+      () =>
+        "otp-gateway",
+
+    handler(req, res) {
+      return sendError(
+        req,
+        res,
+        429,
+        "RATE_LIMITED",
+        "OTP gateway rate limit exceeded",
+      );
+    },
+  });
+
+app.get(
+  "/health/live",
+
+  (req, res) => {
+    return res.json({
+      status: "up",
+    });
+  },
+);
+
+app.get(
+  "/health/ready",
+
+  bearerAuth,
+
+  (req, res) => {
+    const readiness =
+      getReadiness();
+
+    if (!readiness.ready) {
+      return res
+        .status(503)
+        .json({
+          ok: false,
+          request_id:
+            req.requestId,
+          ready: false,
+          channel:
+            "whatsapp",
+          sessions: {
+            ready:
+              readiness.readySessions,
+            total:
+              readiness.totalSessions,
+          },
+          error: {
+            code:
+              "NO_READY_SESSION",
+            message:
+              "No WhatsApp session is ready",
+          },
+        });
+    }
+
+    return res.json({
+      ok: true,
+      request_id:
+        req.requestId,
+      ready: true,
+      channel:
+        "whatsapp",
+      sessions: {
+        ready:
+          readiness.readySessions,
+        total:
+          readiness.totalSessions,
+      },
+    });
+  },
+);
+
+app.get(
+  "/v1/status",
+
+  bearerAuth,
+
+  (req, res) => {
+    return res.json({
+      ok: true,
+      request_id:
+        req.requestId,
+      channel:
+        "whatsapp",
+      sessions:
+        getSessionReport(),
+    });
+  },
+);
+
+app.post(
+  "/v1/otp",
+
+  bearerAuth,
+
+  validateOtpRequest,
+
+  otpGlobalLimiter,
+
+  async (req, res) => {
+    try {
+      const result =
+        await executeOnce(
+          req.otp,
+
+          async () => {
+            const {
+              phone,
+              code,
+              locale,
+            } = req.otp;
+
+            const message =
+              buildOtpMessage(
+                code,
+                locale,
+              );
+
+            try {
+              const sent =
+                await sendOtpMessage(
+                  phone,
+                  message,
+                );
+
+              return {
+                cache: true,
+                httpStatus: 200,
+                payload: {
+                  ok: true,
+                  status:
+                    "accepted",
+                  channel:
+                    "whatsapp",
+                  provider_message_id:
+                    sent.providerMessageId,
+                },
+              };
+            } catch (error) {
+              const codeValue =
+                error.code ||
+                "INTERNAL_ERROR";
+
+              const httpStatus =
+                Number(
+                  error.httpStatus,
+                ) || 500;
+
+              if (
+                codeValue ===
+                "SESSION_UNAVAILABLE"
+              ) {
+                return {
+                  cache: false,
+                  httpStatus: 503,
+                  payload: {
+                    ok: false,
+                    error: {
+                      code:
+                        "SESSION_UNAVAILABLE",
+                      message:
+                        "WhatsApp delivery channel is temporarily unavailable",
+                    },
+                  },
+                };
+              }
+
+              let publicMessage =
+                "OTP could not be sent";
+
+              if (
+                codeValue ===
+                "SEND_TIMEOUT"
+              ) {
+                publicMessage =
+                  "WhatsApp send operation timed out";
+              }
+
+              if (
+                codeValue ===
+                "SEND_FAILED"
+              ) {
+                publicMessage =
+                  "WhatsApp message could not be sent";
+              }
+
+              return {
+                /*
+                 * Ambiguous failures are cached briefly.
+                 * This prevents an HTTP retry from sending
+                 * the same OTP twice immediately.
+                 */
+                cache: true,
+                httpStatus,
+                payload: {
+                  ok: false,
+                  error: {
+                    code:
+                      codeValue,
+                    message:
+                      publicMessage,
+                  },
+                },
+              };
+            }
+          },
+        );
+
+      const responseBody = {
+        ...result.payload,
+
+        request_id:
+          req.requestId,
+
+        deduplicated:
+          result.deduplicated,
+      };
+
+      return res
+        .status(result.httpStatus)
+        .json(responseBody);
+    } catch (error) {
+      logger(
+        "error",
+        "otp.unhandled_send_error",
+        {
+          request_id:
+            req.requestId,
+          reason:
+            error.message,
+        },
+      );
+
+      return sendError(
+        req,
+        res,
+        500,
+        "INTERNAL_ERROR",
+        "Internal server error",
+      );
+    }
+  },
+);
+
+app.use(
+  (req, res) => {
+    return sendError(
+      req,
+      res,
+      404,
+      "NOT_FOUND",
+      "Endpoint not found",
+    );
+  },
+);
+
+app.use(
+  (
+    error,
+    req,
+    res,
+    next,
+  ) => {
+    if (
+      error?.type ===
+      "entity.too.large"
+    ) {
+      return sendError(
+        req,
+        res,
+        413,
+        "PAYLOAD_TOO_LARGE",
+        "Request body is too large",
+      );
+    }
+
+    if (
+      error instanceof SyntaxError &&
+      error.status === 400
+    ) {
+      return sendError(
+        req,
+        res,
+        400,
+        "INVALID_JSON",
+        "Request body contains invalid JSON",
+      );
+    }
+
+    logger(
+      "error",
+      "http.unhandled_error",
+      {
+        request_id:
+          req.requestId,
+        reason:
+          error.message,
+      },
+    );
+
+    return sendError(
+      req,
+      res,
+      500,
+      "INTERNAL_ERROR",
+      "Internal server error",
+    );
+  },
+);
+
+const server =
+  app.listen(
+    config.server.port,
+    config.server.host,
+    () => {
+      logger(
+        "info",
+        "server.started",
+        {
+          host:
+            config.server.host,
+          port:
+            config.server.port,
+          environment:
+            config.env,
+        },
+      );
+
+      config.whatsapp.sessions
+        .forEach(
+          (
+            sessionId,
+            index,
+          ) => {
+            const timer =
+              setTimeout(
+                () => {
+                  initializeSession(
+                    sessionId,
+                  ).catch(
+                    (error) => {
+                      logger(
+                        "error",
+                        "whatsapp.startup_failed",
+                        {
+                          session:
+                            sessionId,
+                          reason:
+                            error.message,
+                        },
+                      );
+                    },
+                  );
+                },
+
+                index * 3000,
+              );
+
+            timer.unref();
+          },
+        );
+    },
   );
 
-  if (!isAllowed) {
-    logger("security", `Forbidden IP attempt: ${clientIp}`);
-    return res
-      .status(403)
-      .json({ error: "Forbidden: Your IP is not allowed." });
+let stopping = false;
+
+async function shutdown(
+  signal,
+  exitCode = 0,
+) {
+  if (stopping) {
+    return;
   }
-  next();
-};
 
-const secureAPI = (req, res, next) => {
-  const clientKey = (req.header("X-API-KEY") || "").trim();
-  const serverKey = (process.env.SECRET_API_KEY || "").trim();
+  stopping = true;
 
-  if (process.env.DEBUG_MODE === "true") {
+  logger(
+    "info",
+    "server.shutdown_started",
+    {
+      signal,
+    },
+  );
+
+  const forceTimer =
+    setTimeout(
+      () => {
+        logger(
+          "fatal",
+          "server.shutdown_timeout",
+        );
+
+        process.exit(1);
+      },
+      10000,
+    );
+
+  forceTimer.unref();
+
+  server.close(
+    async () => {
+      await shutdownSessions();
+
+      clearTimeout(forceTimer);
+
+      logger(
+        "info",
+        "server.shutdown_complete",
+      );
+
+      process.exit(
+        exitCode,
+      );
+    },
+  );
+}
+
+process.on(
+  "SIGTERM",
+  () =>
+    void shutdown(
+      "SIGTERM",
+      0,
+    ),
+);
+
+process.on(
+  "SIGINT",
+  () =>
+    void shutdown(
+      "SIGINT",
+      0,
+    ),
+);
+
+process.on(
+  "uncaughtException",
+  (error) => {
     logger(
-      "debug",
-      `Security Check - Client: [${clientKey}] | Server: [${serverKey}] | Match: ${clientKey === serverKey}`,
-    );
-  }
-
-  if (!clientKey || clientKey !== serverKey) {
-    logger("security", `Unauthorized access attempt from IP: ${req.ip}`);
-    return res.status(401).json({ error: "Unauthorized: Invalid API Key" });
-  }
-  next();
-};
-
-app.use("/send-otp", globalLimiter);
-
-app.post("/send-otp", ipWhitelist, secureAPI, async (req, res) => {
-  const { phone, message, code, session_id } = req.body;
-
-  if (!phone || (!message && !code)) {
-    return res
-      .status(400)
-      .json({ error: "Phone and at least message or code are required" });
-  }
-
-  const activeSessionIds = process.env.SESSION_IDS
-    ? process.env.SESSION_IDS.split(",")
-    : [];
-  const targetId = session_id || activeSessionIds[0];
-  const session = sessions.get(targetId);
-
-  if (!session || session.status !== "READY") {
-    logger("error", `Send attempt failed: Session [${targetId}] is not READY`);
-    return res
-      .status(503)
-      .json({ error: `WhatsApp session [${targetId}] is not ready` });
-  }
-
-  try {
-    let cleanPhone = String(phone)
-      .trim()
-      .replace(/^(?:\+|00)/, "");
-    const formattedPhone = `${cleanPhone}@c.us`;
-
-    let finalMessage = message || "";
-    if (code) {
-      finalMessage = finalMessage ? `${finalMessage}${code}` : `${code}`;
-    }
-
-    await sendSecureMessage(session, formattedPhone, finalMessage);
-
-    logger("success", `Message sent to ${cleanPhone} via [${targetId}]`);
-    res.json({
-      success: true,
-      via: targetId,
-      sender: session.number,
-      status: "Sent",
-    });
-  } catch (err) {
-    logger("error", `Send Error [${targetId}]: ${err.message}`);
-    res
-      .status(500)
-      .json({ error: "Failed to send message", details: err.message });
-  }
-});
-
-app.get("/status", ipWhitelist, secureAPI, (req, res) => {
-  const activeSessionIds = process.env.SESSION_IDS
-    ? process.env.SESSION_IDS.split(",")
-    : [];
-  const report = activeSessionIds.map((id) => {
-    const s = sessions.get(id);
-    return {
-      id,
-      status: s ? s.status : "OFFLINE",
-      number: s ? s.number : null,
-      ready_since: s ? s.readyAt : null,
-    };
-  });
-  res.json(report);
-});
-
-app.get("/health", (req, res) => {
-  const uptime = process.uptime();
-  res.status(200).json({
-    status: "UP",
-    uptime: `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m`,
-    memory_usage: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)} MB`,
-    timestamp: new Date().toISOString(),
-  });
-});
-
-app.delete("/session/:id", ipWhitelist, secureAPI, async (req, res) => {
-  const sessionId = req.params.id;
-  const session = sessions.get(sessionId);
-
-  logger("command", `Manual delete request for session: [${sessionId}]`);
-
-  try {
-    if (session) {
-      await session.client.destroy().catch(() => {});
-      sessions.delete(sessionId);
-    }
-    const sessionPath = path.join(
-      __dirname,
-      ".wwebjs_auth",
-      `session-${sessionId}`,
+      "fatal",
+      "process.uncaught_exception",
+      {
+        reason:
+          error.message,
+      },
     );
 
-    await fsPromises.access(sessionPath).catch(() => null); // بررسی وجود
-    await fsPromises.rm(sessionPath, { recursive: true, force: true });
-    logger("system", `Directory for [${sessionId}] removed successfully.`);
+    void shutdown(
+      "uncaughtException",
+      1,
+    );
+  },
+);
 
-    initializeSession(sessionId);
+process.on(
+  "unhandledRejection",
+  (reason) => {
+    logger(
+      "fatal",
+      "process.unhandled_rejection",
+      {
+        reason:
+          reason instanceof Error
+            ? reason.message
+            : String(reason),
+      },
+    );
 
-    res.json({
-      success: true,
-      message: `Session [${sessionId}] terminated and re-initializing for new QR.`,
-    });
-  } catch (err) {
-    logger("error", `Session cleanup failed: ${err.message}`);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-process.on("uncaughtException", (err) => {
-  logger("fatal", `Uncaught Exception: ${err.message}`);
-  process.exit(1);
-});
-
-process.on("unhandledRejection", (reason, promise) => {
-  const errMsg =
-    reason instanceof Error ? reason.message : JSON.stringify(reason);
-  logger("fatal", `Unhandled Rejection: ${errMsg}`);
-  process.exit(1);
-});
-
-const PORT = process.env.PORT || 30033;
-app.listen(PORT, () => {
-  logger("system", `------------------------------------------------`);
-  logger("system", `WA-GATEWAY-SERVICE STARTED ON PORT ${PORT}`);
-  logger("system", `DEBUG_MODE: ${process.env.DEBUG_MODE}`);
-  logger("system", `TRUST_PROXY: ENABLED`);
-  logger("system", `------------------------------------------------`);
-
-  const activeSessionIds = process.env.SESSION_IDS
-    ? process.env.SESSION_IDS.split(",")
-    : [];
-  activeSessionIds.forEach((id, index) => {
-    setTimeout(() => initializeSession(id), index * 5000);
-  });
-});
+    void shutdown(
+      "unhandledRejection",
+      1,
+    );
+  },
+);

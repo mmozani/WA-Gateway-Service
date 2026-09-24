@@ -1,0 +1,275 @@
+openapi: 3.1.0
+info:
+  title: NeoZone WhatsApp OTP Gateway
+  version: 2.0.0
+  description: Internal WhatsApp OTP delivery gateway for NeoZone.
+servers:
+  - url: http://127.0.0.1:30033
+    description: Local Development
+tags:
+  - name: Health
+  - name: Status
+  - name: OTP
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: Process is alive
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    const: up
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: WhatsApp readiness check
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: At least one session is READY
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          description: No session is READY
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /v1/status:
+    get:
+      tags: [Status]
+      summary: Session status
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Session report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    const: true
+                  request_id:
+                    type: string
+                    format: uuid
+                  channel:
+                    type: string
+                    const: whatsapp
+                  sessions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Session"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  /v1/otp:
+    post:
+      tags: [OTP]
+      summary: Send NeoZone OTP through WhatsApp
+      description: |
+        Backend sends only phone, code and locale.
+        Duplicate protection is automatic inside the gateway.
+        No Idempotency-Key header is required.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OtpRequest"
+            examples:
+              arabic:
+                value:
+                  phone: "+9647700000000"
+                  code: "482913"
+                  locale: ar
+              persian:
+                value:
+                  phone: "+989120000000"
+                  code: "482913"
+                  locale: fa
+      responses:
+        "200":
+          description: Send operation accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OtpSuccess"
+        "400":
+          description: Invalid JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          description: Payload too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "415":
+          description: Unsupported content type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Gateway rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: WhatsApp send failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: No WhatsApp session is ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: WhatsApp send timed out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: ServiceToken
+  responses:
+    Unauthorized:
+      description: Missing or invalid Bearer token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [ok, request_id, error]
+      properties:
+        ok:
+          type: boolean
+          const: false
+        request_id:
+          type:
+            - string
+            - "null"
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    OtpRequest:
+      type: object
+      additionalProperties: false
+      required: [phone, code]
+      properties:
+        phone:
+          type: string
+          pattern: '^\+[1-9][0-9]{7,14}$'
+          example: "+9647700000000"
+        code:
+          type: string
+          pattern: '^[0-9]{4,8}$'
+          example: "482913"
+        locale:
+          type: string
+          enum: [fa, ar, en]
+          default: en
+    OtpSuccess:
+      type: object
+      required: [ok, status, channel, request_id, deduplicated]
+      properties:
+        ok:
+          type: boolean
+          const: true
+        status:
+          type: string
+          const: accepted
+        channel:
+          type: string
+          const: whatsapp
+        provider_message_id:
+          type:
+            - string
+            - "null"
+        request_id:
+          type: string
+          format: uuid
+        deduplicated:
+          type: boolean
+    Readiness:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        request_id:
+          type: string
+        ready:
+          type: boolean
+        channel:
+          type: string
+        sessions:
+          type: object
+          properties:
+            ready:
+              type: integer
+            total:
+              type: integer
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        number:
+          type:
+            - string
+            - "null"
+        ready_since:
+          type:
+            - string
+            - "null"
+        reconnect_attempts:
+          type: integer
+        last_error:
+          type:
+            - string
+            - "null"
